@@ -26,3 +26,12 @@ class User(Base):
             raise ValueError("Invalid CPF")
         return cpf
 
+    def credit(self, amount: float):
+        if amount <= 0:
+            raise ValueError("Invalid amount credit")
+        self.balance += amount
+
+    def debit(self, amount: float):
+        if amount <= 0 or amount > self.balance:
+            raise ValueError("Invalid amount debit")
+        self.balance -= amount
