@@ -22,3 +22,18 @@ class RegisterResponseSchema(BaseModel):
 
     class Config:
         from_attributes = True
+
+class LoginRequestSchema(BaseModel):
+    account: str
+    password: str
+
+    class Config:
+        from_attributes = True
+
+class LoginResponseSchema(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str
+
+    class Config:
+        from_attributes = True

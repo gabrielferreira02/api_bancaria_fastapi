@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 class TransactionService:
     def create_transaction(body: CreateTransactionSchema,
                             session: Session,
-                            transaction_key: UUID):
+                            transaction_key: UUID,
+                            user: User):
         exist_idempotency = (session.query(Idempotency)
                              .filter(Idempotency.idempotency_key == transaction_key)
                              .first())
@@ -54,6 +55,9 @@ class TransactionService:
         
         if sender.account == beneficiary.account:
             raise HTTPException(status_code=400, detail="Sender and beneficiary accont cant be the same")
+        
+        if user.account != body.sender_account:
+            raise HTTPException(status_code=403, detail="Acess denied to this operation")
 
         try:
             sender.debit(body.amount)
@@ -87,7 +91,10 @@ class TransactionService:
             session.rollback()
             raise HTTPException(status_code=500, detail=str(exc))
 
-    def list_transactions(range: int, account: str, page: int, session: Session):
+    def list_transactions(range: int, account: str, page: int, session: Session, user: User):
+        if user.account != account:
+            raise HTTPException(status_code=403, detail="You can see your transactions only")
+        
         ranges = [30, 60, 90]
         if not range in ranges:
             raise HTTPException(status_code=400, detail="Invalid range. Only 30, 60 or 90 days")
@@ -123,15 +130,18 @@ class TransactionService:
             "range_days": range
         }
     
-    def credit(amount: float, account: str, session: Session):
-        user = session.query(User).filter(User.account == account).first()
-        if not user:
+    def credit(amount: float, account: str, session: Session, user: User):
+        exist_user = session.query(User).filter(User.account == account).first()
+        if not exist_user:
             raise HTTPException(status_code = 404, detail="User account not found")
+        
+        if user.account != account:
+            raise HTTPException(status_code=403, detail="You can credit your account only")
         try:
-            user.credit(amount)
-            user.updated_at = datetime.now()
+            exist_user.credit(amount)
+            exist_user.updated_at = datetime.now()
             session.commit()
-            return user
+            return exist_user
         except ValueError as exc:
             raise HTTPException(status_code = 400, detail=str(exc))
         except Exception as exc:

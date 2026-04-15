@@ -1,9 +1,12 @@
-from app.schemas.auth_schemas import RegisterSchema
+from app.schemas.auth_schemas import RegisterSchema, LoginRequestSchema, LoginResponseSchema
 from fastapi import HTTPException
 from app.models.user import User
 from app.helpers.generate_account_number import generate_account_number
+from app.helpers.generate_token import generate_token
 from sqlalchemy.orm import Session
 from app.core.security import pwd_context
+from datetime import timedelta
+from fastapi.security import OAuth2PasswordRequestForm
 
 class AuthService:
     def register(body: RegisterSchema, session: Session):
@@ -35,3 +38,52 @@ class AuthService:
         session.flush()
 
         return user
+    
+    def login(body: LoginRequestSchema, session: Session):
+        if not body.account or not body.password:
+            raise HTTPException(status_code=400, detail="Invalid account number or password")
+        
+        user = session.query(User).filter(User.account == body.account).first()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="Account number not found")
+        
+        if not pwd_context.verify(body.password, user.password):
+            raise HTTPException(status_code=400, detail="Invalid password")
+
+        token = generate_token(user.account)
+        refresh_token = generate_token(user.account, timedelta(days=7))
+
+        return LoginResponseSchema(
+            access_token=token, 
+            refresh_token=refresh_token, 
+            token_type="bearer")
+    
+    def refresh_token(user: User):
+        token = generate_token(user.account)
+        refresh_token = generate_token(user.account, timedelta(days=7))
+
+        return LoginResponseSchema(
+            access_token=token, 
+            refresh_token=refresh_token, 
+            token_type="bearer")
+    
+    def login_docs(body: OAuth2PasswordRequestForm, session: Session):
+        if not body.username or not body.password:
+            raise HTTPException(status_code=400, detail="Invalid account number or password")
+        
+        user = session.query(User).filter(User.account == body.username).first()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="Account number not found")
+        
+        if not pwd_context.verify(body.password, user.password):
+            raise HTTPException(status_code=400, detail="Invalid password")
+
+        token = generate_token(user.account)
+        refresh_token = generate_token(user.account, timedelta(days=7))
+
+        return LoginResponseSchema(
+            access_token=token, 
+            refresh_token=refresh_token, 
+            token_type="bearer")
